@@ -128,9 +128,10 @@ class IshchiGuruh(models.Model):
 class UserProfile(models.Model):
     full_name = models.CharField(max_length=255)
     login = models.CharField(max_length=100, unique=True)
+
     password = models.CharField(max_length=128)  # Hashlangan bo'lishi kerak
     phone = models.CharField(max_length=20)
-    tabel_raqami = models.CharField(max_length=50, unique=True)
+    tabel_raqami = models.CharField(max_length=50, unique=True, blank=True, null=True)
 
     # Izolyatsiya va Guruhlash
     is_boss = models.BooleanField(default=False)  # Boshliqlarni ajratish uchun
@@ -147,10 +148,11 @@ class UserProfile(models.Model):
     # Ish ma'lumotlari
     razryad = models.CharField(max_length=10, blank=True, null=True)
     oklad = models.DecimalField(max_digits=15, decimal_places=2, default=Decimal('0.00'))
+    route_data = models.TextField(default="[]")
 
     # Jonli lokatsiya (Oxirgi turgan joyi)
-    latitude = models.FloatField(default=0.0)
-    longitude = models.FloatField(default=0.0)
+    lat = models.FloatField(default=0.0)
+    lng = models.FloatField(default=0.0)
     distance_km = models.FloatField(default=0.0)
 
     # Xavfsizlik va holat
