@@ -14,7 +14,164 @@ from my_app.models import UserProfile, IshchiGuruh ,Otryad,WorkHistory
 from django.utils import timezone
 from django.db.models import Q
 import json
+import uuid
 import math
+from django.contrib.auth.hashers import make_password
+
+
+def boss_registration(request):
+    # Otryad va Guruhlarni bazadan olish
+    otryadlar = Otryad.objects.all()
+    guruhlar = IshchiGuruh.objects.all()
+
+    if request.method == "POST":
+        # Formadan ma'lumotlarni olish
+        f_name = request.POST.get('f_name', '').strip()
+        l_name = request.POST.get('l_name', '').strip()
+        u_login = request.POST.get('u_login')
+        u_pass = request.POST.get('u_pass')
+        u_phone = request.POST.get('phone')
+        u_otryad_id = request.POST.get('otryad')
+        u_guruh_id = request.POST.get('guruh')
+
+        # Manzil ma'lumotlari
+        viloyat = request.POST.get('viloyat')
+        tuman = request.POST.get('tuman')
+        mahalla = request.POST.get('mahalla')
+        kocha = request.POST.get('kocha')
+        uy = request.POST.get('uy')
+
+        # --- YECHIM: Noyob tabel raqami generatsiya qilish ---
+        # "BOSHLIQ" o'rniga login yoki tasodifiy raqam ishlatamiz
+        unique_tabel_raqami = f"BOSHLIQ-{u_login}-{uuid.uuid4().hex[:4].upper()}"
+
+        try:
+            # Bazaga saqlash
+            new_boss = UserProfile.objects.create(
+                full_name=f"{f_name} {l_name}",
+                login=u_login,
+                password=make_password(u_pass),
+                phone=u_phone,
+
+                # --- Noyaob raqam berildi ---
+                tabel_raqami=unique_tabel_raqami,
+
+                # ForeignKey maydonlar
+                otryad_id=u_otryad_id if u_otryad_id else None,
+                guruh_id=u_guruh_id if u_guruh_id else None,
+
+                # Manzil
+                viloyat=viloyat,
+                shahar_tuman=tuman,
+                mahalla=mahalla,
+                kocha=kocha,
+                uy_raqami=uy,
+
+                # Majburiy maydonlar
+                lat=0.0,
+                lng=0.0,
+                route_data="[]",
+                distance_km=0.0,
+
+                is_boss=True,
+                is_active=True
+            )
+            return redirect('/')
+        except Exception as e:
+            # Agar login allaqachon mavjud bo'lsa yoki boshqa xato
+            return HttpResponse(f"Xatolik yuz berdi: {e}")
+
+    # Registratsiya Formasi (HTML o'zgarishsiz)
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="uz">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boshliqlar Registratsiyasi</title>
+        <style>
+            :root {{ --neon: #00f2ff; }}
+            body {{ background: #050505; color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }}
+            .reg-box {{ background: #111; padding: 30px; border-radius: 25px; width: 100%; max-width: 450px; border: 1px solid var(--neon); box-shadow: 0 0 15px rgba(0, 242, 255, 0.2); }}
+            h2 {{ color: var(--neon); text-align: center; text-transform: uppercase; letter-spacing: 2px; }}
+            input, select {{ width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }}
+            input:focus, select:focus {{ outline: none; border-color: var(--neon); }}
+            .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
+            button {{ width: 100%; padding: 15px; background: var(--neon); border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 20px; color: black; transition: 0.3s; }}
+            button:hover {{ background: #00c8d4; transform: translateY(-2px); }}
+            label {{ font-size: 12px; color: #888; margin-left: 5px; }}
+        </style>
+    </head>
+    <body>
+        <div class="reg-box">
+            <h2>Boshliq Ro'yxati</h2>
+            <form method="POST">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{get_token(request)}">
+
+                <div class="grid-2">
+                    <input type="text" name="f_name" placeholder="Ism" required>
+                    <input type="text" name="l_name" placeholder="Familiya" required>
+                </div>
+
+                <input type="text" name="u_login" placeholder="Login (noyob)" required>
+                <input type="password" name="u_pass" placeholder="Parol" required>
+                <input type="text" name="phone" placeholder="Telefon (998...)" required>
+
+                <label>Otryadni tanlang:</label>
+                <select name="otryad">
+                    <option value="">Tanlanmagan</option>
+                    {"".join([f'<option value="{o.id}">{o.nomi}</option>' for o in otryadlar])}
+                </select>
+
+                <label>Guruhni tanlang:</label>
+                <select name="guruh">
+                    <option value="">Tanlanmagan</option>
+                    {"".join([f'<option value="{g.id}">{g.nomi}</option>' for g in guruhlar])}
+                </select>
+
+                <hr style="border: 0.5px solid #222; margin: 15px 0;">
+                <p style="font-size: 14px; color: var(--neon);">Yashash manzili:</p>
+
+                <div class="grid-2">
+                    <input type="text" name="viloyat" placeholder="Viloyat">
+                    <input type="text" name="tuman" placeholder="Tuman">
+                </div>
+                <input type="text" name="mahalla" placeholder="Mahalla">
+                <div class="grid-2">
+                    <input type="text" name="kocha" placeholder="Ko'cha">
+                    <input type="text" name="uy" placeholder="Uy raqami">
+                </div>
+
+                <button type="submit">TASDIQLASH VA SAQLASH</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+    return HttpResponse(html)
+
+
+def login_view(request):
+    if request.method == "POST":
+        u_login = request.POST.get('u_login')
+        u_pass = request.POST.get('u_pass')
+
+        try:
+            user = UserProfile.objects.get(login=u_login)
+
+            # --- SHU YERNI TEKSHIRING ---
+            if check_password(u_pass, user.password):
+                # Parol to'g'ri
+                # Tizimga kirish logikasi (sessionga saqlash va h.k.)
+                return redirect('dashboard')
+            else:
+                # Parol noto'g'ri
+                return render(request, 'login.html', {'error': 'Parol noto\'g\'ri'})
+        except UserProfile.DoesNotExist:
+            # Foydalanuvchi topilmadi
+            return render(request, 'login.html', {'error': 'Login noto\'g\'ri'})
+
+    return render(request, 'login.html')
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
     Ikkita geografik nuqta orasidagi masofani kilometrda hisoblaydi (Haversine formulasi).
@@ -254,11 +411,16 @@ def get_single_location(request, worker_id):
             'distance_km': round(worker.distance_km, 2)  # Masofa
         })
     return JsonResponse({'error': 'Topilmadi'}, status=404)
+
+
 def track_worker(request, worker_id):
     worker = UserProfile.objects.filter(id=worker_id).first()
     if not worker: return HttpResponse("Ishchi topilmadi", status=404)
 
-    video_url = static('uzb.mp4')
+    # Django backendida qiymatlarni olish va None bo'lsa default berish
+    # Bu usul JS o'zgaruvchisiga to'g'ri qiymat tushishini ta'minlaydi
+    current_lat = worker.lat if worker.lat else 41.311081
+    current_lng = worker.lng if worker.lng else 69.240562
 
     html = f"""
     <!DOCTYPE html>
@@ -270,27 +432,30 @@ def track_worker(request, worker_id):
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
         <style>
-            body, html {{ margin: 0; height: 100%; overflow: hidden; background: #000; font-family: sans-serif; }}
+            body, html {{ margin: 0; height: 100%; overflow: hidden; background: #fff; font-family: sans-serif; }}
             #map {{ width: 100%; height: 100vh; z-index: 1; }}
-            #bg-video {{ position: fixed; top: 0; left: 0; min-width: 100%; min-height: 100%; z-index: -1; object-fit: cover; filter: brightness(0.3); }}
 
             .top-info {{
                 position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-                z-index: 1000; background: rgba(0,0,0,0.8); padding: 10px 20px;
-                border-radius: 30px; border: 1px solid #00f2ff; color: white;
+                z-index: 1000; background: rgba(255,255,255,0.9); padding: 10px 20px;
+                border-radius: 30px; border: 1px solid #ccc; color: #000;
                 text-align: center; backdrop-filter: blur(10px);
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }}
-            .back-btn {{ position: absolute; top: 20px; left: 20px; z-index: 1000; background: #00f2ff; color: #000; padding: 10px 15px; border-radius: 50%; text-decoration: none; font-weight: bold; }}
+            .back-btn {{ 
+                position: absolute; top: 20px; left: 20px; z-index: 1000; 
+                background: #007bff; color: white; padding: 10px 15px; 
+                border-radius: 50%; text-decoration: none; font-weight: bold;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }}
         </style>
     </head>
     <body>
-        <video loop playsinline id="bg-video"><source src="{video_url}" type="video/mp4"></video>
-
         <a href="/worker-list/" class="back-btn"><i class="fas fa-arrow-left"></i></a>
 
         <div class="top-info">
-            <b>{worker.full_name}</b> <br>
-            <small id="status">Yuklanmoqda...</small>
+            <b style="color: #000;">{worker.full_name}</b> <br>
+            <small id="status" style="color: #555;">Yuklanmoqda...</small>
         </div>
 
         <div id="map"></div>
@@ -298,47 +463,54 @@ def track_worker(request, worker_id):
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
             const workerId = "{worker.id}";
-            var lat = {worker.lat} || 41.311081; 
-            var lng = {worker.lng} || 69.240562;
 
-            var map = L.map('map', {{ zoomControl: false }}).setView([lat, lng], 15);
+            // BACKENDDAN KELGAN HOZIRGI LOCATSIYANI ISHLATISH
+            var map = L.map('map', {{ zoomControl: false }}).setView([{current_lat}, {current_lng}], 15);
 
-            L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png').addTo(map);
+            L.tileLayer('https://{{s}}.basemaps.cartocdn.com/rastertiles/voyager/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }}).addTo(map);
 
-            var marker = L.marker([lat, lng]).addTo(map);
-
-            // Ko'k chiziq
+            // Boshlang'ich marker
+            var marker = L.marker([{current_lat}, {current_lng}]).addTo(map);
             var polyline = L.polyline([], {{
-                color: '#00f2ff', weight: 6, opacity: 0.8
+                color: '#007bff', weight: 5, opacity: 0.7
             }}).addTo(map);
 
             async function updateTracking() {{
                 try {{
+                    // HAR DOIM ENG YANGI LOCATSIYANI API DAN OLISH
                     const response = await fetch(`/get-single-location/${{workerId}}/`);
                     const data = await response.json();
 
                     if (data.lat && data.lng) {{
                         const newPos = [data.lat, data.lng];
-                        marker.setLatLng(newPos);
 
-                        // Chiziqni yangilash
+                        // Marker va xaritani yangilash
+                        marker.setLatLng(newPos);
+                        map.panTo(newPos);
+
                         if (data.route_list) {{
                             polyline.setLatLngs(data.route_list);
                         }}
 
-                        map.panTo(newPos);
-                        document.getElementById('status').innerText = data.is_working ? "🔴 HARAKATDA" : "⚪ TO'XTAGAN";
+                        // Statusni yangilash
+                        const statusEl = document.getElementById('status');
+                        if (data.is_working) {{
+                            statusEl.innerText = "HARAKATDA";
+                            statusEl.style.color = "green";
+                        }} else {{
+                            statusEl.innerText = "TO'XTAGAN";
+                            statusEl.style.color = "red";
+                        }}
                     }}
                 }} catch (e) {{ console.log("Xato:", e); }}
             }}
 
-            document.body.addEventListener('click', () => {{
-                const v = document.getElementById('bg-video');
-                v.muted = false; v.volume = 0.3; v.play();
-            }}, {{ once: true }});
-
-            setInterval(updateTracking, 3000);
+            // Sahifa yuklanganda darhol chaqiramiz
             updateTracking();
+            // Keyin har 3 soniyada yangilab turamiz
+            setInterval(updateTracking, 3000);
         </script>
     </body>
     </html>
@@ -2260,116 +2432,9 @@ def map_view(request):
     </html>
     """
     return HttpResponse(html)
-def boss_registration(request):
-    # Otryad va Guruhlarni bazadan olish
-    otryadlar = Otryad.objects.all()
-    guruhlar = IshchiGuruh.objects.all()
 
-    if request.method == "POST":
-        # Formadan ma'lumotlarni olish
-        f_name = request.POST.get('f_name', '').strip()
-        l_name = request.POST.get('l_name', '').strip()
-        u_login = request.POST.get('u_login')
-        u_pass = request.POST.get('u_pass')
-        u_phone = request.POST.get('phone')
-        u_otryad_id = request.POST.get('otryad')
-        u_guruh_id = request.POST.get('guruh')
 
-        # Manzil ma'lumotlari
-        viloyat = request.POST.get('viloyat')
-        tuman = request.POST.get('tuman')
-        mahalla = request.POST.get('mahalla')
-        kocha = request.POST.get('kocha')
-        uy = request.POST.get('uy')
 
-        # Bazaga saqlash
-        # DIQQAT: Modelingizda first_name/last_name yo'q, shuning uchun full_name ga birlashtiramiz
-        new_boss = UserProfile.objects.create(
-            full_name=f"{f_name} {l_name}",
-            login=u_login,
-            password=u_pass,
-            phone=u_phone,
-            tabel_raqami="BOSHLIQ",  # Modelda bu maydon majburiy bo'lgani uchun qiymat berdik
-            otryad_id=u_otryad_id if u_otryad_id else None,
-            guruh_id=u_guruh_id if u_guruh_id else None,
-            viloyat=viloyat,
-            shahar_tuman=tuman,
-            mahalla=mahalla,
-            kocha=kocha,
-            uy_raqami=uy,
-            is_boss=True,
-            is_active=True  # Boshliq darrov tizimga kira olishi uchun
-        )
-        return redirect('/')
-
-    # Registratsiya Formasi (Boshliqlar uchun) HTML qismi
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="uz">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Boshliqlar Registratsiyasi</title>
-        <style>
-            :root {{ --neon: #00f2ff; }}
-            body {{ background: #050505; color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }}
-            .reg-box {{ background: #111; padding: 30px; border-radius: 25px; width: 100%; max-width: 450px; border: 1px solid var(--neon); box-shadow: 0 0 15px rgba(0, 242, 255, 0.2); }}
-            h2 {{ color: var(--neon); text-align: center; text-transform: uppercase; letter-spacing: 2px; }}
-            input, select {{ width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #333; background: #222; color: white; box-sizing: border-box; }}
-            input:focus, select:focus {{ outline: none; border-color: var(--neon); }}
-            .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-            button {{ width: 100%; padding: 15px; background: var(--neon); border: none; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 20px; color: black; transition: 0.3s; }}
-            button:hover {{ background: #00c8d4; transform: translateY(-2px); }}
-            label {{ font-size: 12px; color: #888; margin-left: 5px; }}
-        </style>
-    </head>
-    <body>
-        <div class="reg-box">
-            <h2>Boshliq Ro'yxati</h2>
-            <form method="POST">
-                <input type="hidden" name="csrfmiddlewaretoken" value="{get_token(request)}">
-
-                <div class="grid-2">
-                    <input type="text" name="f_name" placeholder="Ism" required>
-                    <input type="text" name="l_name" placeholder="Familiya" required>
-                </div>
-
-                <input type="text" name="u_login" placeholder="Login" required>
-                <input type="password" name="u_pass" placeholder="Parol" required>
-                <input type="text" name="phone" placeholder="Telefon (998...)" required>
-
-                <label>Otryadni tanlang:</label>
-                <select name="otryad">
-                    <option value="">Tanlanmagan</option>
-                    {"".join([f'<option value="{o.id}">{o.nomi}</option>' for o in otryadlar])}
-                </select>
-
-                <label>Guruhni tanlang:</label>
-                <select name="guruh">
-                    <option value="">Tanlanmagan</option>
-                    {"".join([f'<option value="{g.id}">{g.nomi}</option>' for g in guruhlar])}
-                </select>
-
-                <hr style="border: 0.5px solid #222; margin: 15px 0;">
-                <p style="font-size: 14px; color: var(--neon);">Yashash manzili:</p>
-
-                <div class="grid-2">
-                    <input type="text" name="viloyat" placeholder="Viloyat">
-                    <input type="text" name="tuman" placeholder="Tuman">
-                </div>
-                <input type="text" name="mahalla" placeholder="Mahalla">
-                <div class="grid-2">
-                    <input type="text" name="kocha" placeholder="Ko'cha">
-                    <input type="text" name="uy" placeholder="Uy raqami">
-                </div>
-
-                <button type="submit">TASDIQLASH VA SAQLASH</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    """
-    return HttpResponse(html)
 def signup(request):
     video_url = static('uzb.mp4')
 
