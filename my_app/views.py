@@ -150,28 +150,6 @@ def boss_registration(request):
     """
     return HttpResponse(html)
 
-
-def login_view(request):
-    if request.method == "POST":
-        u_login = request.POST.get('u_login')
-        u_pass = request.POST.get('u_pass')
-
-        try:
-            user = UserProfile.objects.get(login=u_login)
-
-            # --- SHU YERNI TEKSHIRING ---
-            if check_password(u_pass, user.password):
-                # Parol to'g'ri
-                # Tizimga kirish logikasi (sessionga saqlash va h.k.)
-                return redirect('dashboard')
-            else:
-                # Parol noto'g'ri
-                return render(request, 'login.html', {'error': 'Parol noto\'g\'ri'})
-        except UserProfile.DoesNotExist:
-            # Foydalanuvchi topilmadi
-            return render(request, 'login.html', {'error': 'Login noto\'g\'ri'})
-
-    return render(request, 'login.html')
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
     Ikkita geografik nuqta orasidagi masofani kilometrda hisoblaydi (Haversine formulasi).
@@ -2944,3 +2922,4 @@ def hisobot(request):
         </html>
     """
     return HttpResponse(html)
+
